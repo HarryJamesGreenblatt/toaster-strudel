@@ -71,6 +71,55 @@ def render_levels(values: np.ndarray) -> str:
     return "".join(ramp[min(len(ramp) - 1, int(v * (len(ramp) - 1) + 0.5))] for v in values)
 
 
+# Krumhansl-Schmuckler key profiles
+_KS_MAJOR = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
+_KS_MINOR = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
+_PITCHES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+
+def estimate_key(y: np.ndarray, sr: int) -> dict:
+    """Estimate musical key via chroma correlation with Krumhansl-Schmuckler profiles."""
+    import librosa
+
+    chroma = librosa.feature.chroma_cqt(y=y, sr=sr).mean(axis=1)
+    chroma = chroma / (chroma.sum() + 1e-9)
+    best = None
+    for i in range(12):
+        maj = np.corrcoef(chroma, np.roll(_KS_MAJOR, i))[0, 1]
+        minr = np.corrcoef(chroma, np.roll(_KS_MINOR, i))[0, 1]
+        for mode, score in (("major", maj), ("minor", minr)):
+            if best is None or score > best[2]:
+                best = (_PITCHES[i], mode, score)
+    tonic, mode, score = best
+    return {"key": f"{tonic} {mode}", "tonic": tonic, "mode": mode, "confidence": round(float(score), 3)}
+
+
+def _hz_to_note(hz: float) -> str:
+    import librosa
+
+    return librosa.hz_to_note(hz, unicode=False).lower().replace("♯", "#")
+
+
+def extract_bassline(y: np.ndarray, sr: int) -> dict:
+    """Monophonic pitch-track the bass stem (pyin), report the note per beat."""
+    import librosa
+
+    tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr, units="frames")
+    tempo = float(np.atleast_1d(tempo)[0])
+    beat_times = librosa.frames_to_time(beat_frames, sr=sr)
+
+    f0, voiced, _ = librosa.pyin(y, fmin=40.0, fmax=400.0, sr=sr)
+    t = librosa.times_like(f0, sr=sr)
+
+    notes = []
+    for i in range(len(beat_times) - 1):
+        lo, hi = beat_times[i], beat_times[i + 1]
+        mask = (t >= lo) & (t < hi) & voiced & np.isfinite(f0)
+        vals = f0[mask]
+        notes.append(_hz_to_note(float(np.median(vals))) if len(vals) else "~")
+    return {"bpm": round(tempo, 1), "beats": len(beat_times), "notes_per_beat": notes}
+
+
 def analyze(y: np.ndarray, sr: int, bars: int = 4, fixed_tempo: float | None = None) -> dict:
     import librosa
 
@@ -152,6 +201,8 @@ def main() -> int:
     ap.add_argument("--bars", type=int, default=4)
     ap.add_argument("--json", action="store_true", help="emit JSON only")
     ap.add_argument("--bands", action="store_true", help="split into low/mid/high percussion registers")
+    ap.add_argument("--key", action="store_true", help="estimate musical key (chroma / Krumhansl-Schmuckler)")
+    ap.add_argument("--bassline", action="store_true", help="pitch-track the bass (note per beat)")
     ap.add_argument("--selftest", action="store_true", help="synthesize & analyze a 90 BPM clip")
     args = ap.parse_args()
 
@@ -165,6 +216,18 @@ def main() -> int:
     else:
         ap.print_help()
         return 1
+
+    if args.key:
+        k = estimate_key(y, sr)
+        print(f"key = {k['key']}   (confidence {k['confidence']})")
+        return 0
+
+    if args.bassline:
+        b = extract_bassline(y, sr)
+        print(f"bpm={b['bpm']}  beats={b['beats']}")
+        print("note per beat:")
+        print("  " + " ".join(b["notes_per_beat"]))
+        return 0
 
     # --bands: share one tempo, report a grid per frequency register
     if args.bands:
