@@ -59,6 +59,26 @@ Measure pitch, not just rhythm: rhythm accuracy alone won't match a recording if
 key/harmony are guessed. Feed the detected key + progression straight into `note(...)`,
 `chord("<...>")`, and `.voicing()`.
 
+## Second pass — per-stem transcription (works now)
+
+The analyses above *summarize* a stem. To actually reproduce it, transcribe each
+isolated stem into discrete note/onset events quantized to a grid:
+
+```powershell
+# Monophonic (bass, lead): onset + per-onset pitch -> note("<[bar] ...>")
+python transcribe_stem.py stems\bass.wav  --mode mono --bpm 97.5 --grid 16 --bars 8
+
+# Unpitched (drum stem): onset + velocity -> s(sound).struct(...).gain(...)
+python transcribe_stem.py stems\drums.wav --mode perc --bpm 97.5 --grid 16 --bars 8
+```
+
+This is what `--bassline` (one median pitch per beat) could not do: it recovers the
+real sub-beat rhythm and note changes — e.g. the cumbia bass's `f2 ~ ~ ~ c2 ~ c3 ~`
+octave pump, which the per-beat median flattened to a single `f2`.
+
+Polyphonic stems (accordion in `other`) need multi-pitch transcription — a future
+`basic-pitch` add. `mono` handles single-line parts well today.
+
 ## Roadmap
 
 - **Phase 3 — audio → MIDI:** Spotify `basic-pitch` emits MIDI for melodic/bass
