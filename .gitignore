@@ -1,0 +1,30 @@
+# Personal WIP — not for publishing
+/jams/
+/arrangements/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Downloaded / captured media — COPYRIGHT: never publish
+*.mid
+*.midi
+*.wav
+*.flac
+*.mp3
+*.m4a
+*.ogg
+/data/
+/captures/
+
+# Python MIR sidecar
+mir/.venv/
+**/__pycache__/
+*.pyc
+*.pyo
+.python-version
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
