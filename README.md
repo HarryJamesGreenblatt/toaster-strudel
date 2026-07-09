@@ -71,10 +71,13 @@ verdict on whether hits land on the straight-16th grid or the triplet grid — t
 
 ## Roadmap
 
-- **MIR sidecar (`mir/`)** — Python: capture real audio (WASAPI loopback) →
-  stem-separate (Demucs) → tempo/downbeats (madmom) → audio-to-MIDI (Spotify
-  basic-pitch) → feed the existing `analyze-drums.js` / `tab2strudel.js` tools.
-  Audio-to-MIDI closes the loop: any recording becomes verifiable groove data.
+- **MIR sidecar (`mir/`)** — Python audio analysis. Capture real audio (WASAPI
+  loopback) and measure the groove:
+  - **Phase 1 (done):** tempo → `setcpm(bpm/4)`, onset grid + straight/triplet feel.
+  - **Phase 2 (done):** Demucs stem separation, then per-register band analysis
+    (low/mid/high) with an accent-intensity grid — isolates güira vs congas vs bombo.
+  - **Phase 3 (next):** Spotify `basic-pitch` audio→MIDI for melodic/bass lines,
+    feeding the existing `analyze-drums.js` / `tab2strudel.js` tools.
 
 ## Licensing notes
 

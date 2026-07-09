@@ -26,12 +26,61 @@ def classify_phase(phase: float) -> tuple[float, float]:
     return near(straight), near(triplet)
 
 
-def analyze(y: np.ndarray, sr: int, bars: int = 4) -> dict:
+# Frequency bands mapped to cumbia percussion physics
+BANDS = {
+    "low  (bombo/kick)": (20, 200),
+    "mid  (congas/timbal)": (200, 2000),
+    "high (guira/hats)": (2000, 16000),
+}
+
+
+def bandpass(y: np.ndarray, sr: int, lo: float, hi: float) -> np.ndarray:
+    """4th-order Butterworth bandpass (zero-phase) to isolate a percussion register."""
+    from scipy.signal import butter, sosfiltfilt
+
+    nyq = sr / 2.0
+    hi = min(hi, nyq * 0.99)
+    sos = butter(4, [lo / nyq, hi / nyq], btype="band", output="sos")
+    return sosfiltfilt(sos, y).astype(np.float32)
+
+
+def accent_grid(y: np.ndarray, sr: int, tempo: float, steps: int = 16) -> np.ndarray:
+    """Average onset-strength per 16th-step of the bar (0..1). Reveals ACCENTS in a
+    continuous scrape where onset-counting saturates."""
     import librosa
 
-    # tempo + beat grid
-    tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr, units="frames")
-    tempo = float(np.atleast_1d(tempo)[0])
+    env = librosa.onset.onset_strength(y=y, sr=sr)
+    times = librosa.times_like(env, sr=sr, hop_length=512)
+    beat_sec = 60.0 / tempo if tempo > 0 else 0.0
+    if beat_sec <= 0:
+        return np.zeros(steps)
+    acc = np.zeros(steps)
+    cnt = np.zeros(steps)
+    for t, e in zip(times, env):
+        idx = int(((t / (beat_sec * 4)) % 1.0) * steps) % steps
+        acc[idx] += e
+        cnt[idx] += 1
+    acc = acc / np.maximum(cnt, 1)
+    peak = acc.max()
+    return acc / peak if peak > 0 else acc
+
+
+def render_levels(values: np.ndarray) -> str:
+    """Render a 0..1 array as a heat bar so accent contours are visible."""
+    ramp = " .:-=+*#%@"
+    return "".join(ramp[min(len(ramp) - 1, int(v * (len(ramp) - 1) + 0.5))] for v in values)
+
+
+def analyze(y: np.ndarray, sr: int, bars: int = 4, fixed_tempo: float | None = None) -> dict:
+    import librosa
+
+    # tempo + beat grid (or reuse a shared tempo when analyzing bands)
+    if fixed_tempo is None:
+        tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr, units="frames")
+        tempo = float(np.atleast_1d(tempo)[0])
+    else:
+        tempo = fixed_tempo
+        beat_frames = []
 
     # onsets (times in seconds)
     onset_frames = librosa.onset.onset_detect(y=y, sr=sr, backtrack=True)
@@ -102,6 +151,7 @@ def main() -> int:
     ap.add_argument("audio", nargs="?", help="path to a WAV/FLAC/MP3 clip")
     ap.add_argument("--bars", type=int, default=4)
     ap.add_argument("--json", action="store_true", help="emit JSON only")
+    ap.add_argument("--bands", action="store_true", help="split into low/mid/high percussion registers")
     ap.add_argument("--selftest", action="store_true", help="synthesize & analyze a 90 BPM clip")
     args = ap.parse_args()
 
@@ -115,6 +165,23 @@ def main() -> int:
     else:
         ap.print_help()
         return 1
+
+    # --bands: share one tempo, report a grid per frequency register
+    if args.bands:
+        import librosa
+
+        tempo, _ = librosa.beat.beat_track(y=y, sr=sr, units="frames")
+        tempo = float(np.atleast_1d(tempo)[0])
+        print(f"bpm={round(tempo,1)}   ->   setcpm({round(tempo,1)}/4)   (shared across bands)\n")
+        for label, (lo, hi) in BANDS.items():
+            yb = bandpass(y, sr, lo, hi)
+            r = analyze(yb, sr, bars=args.bars, fixed_tempo=tempo)
+            acc = accent_grid(yb, sr, tempo)
+            print(f"{label:22} onsets |{r['grid_str']}|")
+            print(f"{'':22} accent |{render_levels(acc)}|  feel={r['feel']}")
+        print("\nonsets: X=hit x=weak .=rest   accent: @=loud ... .=soft ' '=silent")
+        print("the guira 'chu-[gap]-chuchu' shows as an ACCENT dip on the 2nd 16th, not a rest.")
+        return 0
 
     result = analyze(y, sr, bars=args.bars)
 
