@@ -21,6 +21,13 @@ import sys
 import librosa
 import numpy as np
 
+from analyze_audio import bandpass, _CHORD_TEMPLATES, _PITCHES, _template_vec
+
+# frequency registers for splitting a drum stem into instruments
+BAND_RANGES = {"low": (20, 200), "mid": (200, 2000), "high": (2000, 16000)}
+# a reasonable default Strudel sound per register
+BAND_SOUND = {"low": "bd", "mid": "lt", "high": "hh"}
+
 
 def _note(hz: float) -> str:
     return librosa.hz_to_note(hz, unicode=False).lower().replace("♯", "#")
@@ -66,7 +73,11 @@ def transcribe_mono(y: np.ndarray, sr: int, bpm: float | None, grid: int, bars: 
     return {"bpm": round(bpm, 1), "grid": grid, "events": events, "bars": bars_out, "mini": mini}
 
 
-def transcribe_perc(y: np.ndarray, sr: int, bpm: float | None, grid: int, bars: int | None) -> dict:
+def transcribe_perc(y: np.ndarray, sr: int, bpm: float | None, grid: int, bars: int | None,
+                    band: str | None = None, gate: float = 0.0, fold: bool = False) -> dict:
+    if band:
+        lo, hi = BAND_RANGES[band]
+        y = bandpass(y, sr, lo, hi)
     bpm, t0 = _grid_anchor(y, sr, bpm)
     step = (60.0 / bpm) / (grid / 4.0)
     onsets = librosa.onset.onset_detect(y=y, sr=sr, backtrack=True, units="time")
@@ -74,17 +85,33 @@ def transcribe_perc(y: np.ndarray, sr: int, bpm: float | None, grid: int, bars: 
     et = librosa.times_like(env, sr=sr)
 
     dur = librosa.get_duration(y=y, sr=sr)
-    total = bars * grid if bars else int(np.ceil((dur - t0) / step))
-    hits = [0.0] * max(total, 0)
-    for ot in onsets:
-        idx = int(round((ot - t0) / step))
-        if 0 <= idx < total:
+    if fold:
+        # accumulate onset velocity per 16th-position across ALL bars -> one loop bar
+        total = grid
+        hits = [0.0] * grid
+        counts = [0] * grid
+        for ot in onsets:
+            cell = int(round((ot - t0) / step))
+            if cell < 0:
+                continue
+            idx = cell % grid
             j = int(np.argmin(np.abs(et - ot)))
-            hits[idx] = max(hits[idx], float(env[j]))
+            hits[idx] += float(env[j])
+            counts[idx] += 1
+        hits = [h / c if c else 0.0 for h, c in zip(hits, counts)]
+    else:
+        total = bars * grid if bars else int(np.ceil((dur - t0) / step))
+        hits = [0.0] * max(total, 0)
+        for ot in onsets:
+            idx = int(round((ot - t0) / step))
+            if 0 <= idx < total:
+                j = int(np.argmin(np.abs(et - ot)))
+                hits[idx] = max(hits[idx], float(env[j]))
     peak = max(hits) if hits and max(hits) > 0 else 1.0
-    struct = "".join("x" if h > 0 else "~" for h in hits)  # placeholder, split below
-    struct_cells = ["x" if h > 0 else "~" for h in hits]
-    gain_cells = [f"{(h / peak):.2f}" if h > 0 else "0" for h in hits]
+    norm = [(h / peak) if h > 0 else 0.0 for h in hits]
+    norm = [v if v >= gate else 0.0 for v in norm]          # drop ghost/bleed hits
+    struct_cells = ["x" if v > 0 else "~" for v in norm]
+    gain_cells = [f"{v:.2f}" if v > 0 else "0" for v in norm]
 
     bars_struct = [" ".join(struct_cells[b:b + grid]) for b in range(0, total, grid)]
     bars_gain = [" ".join(gain_cells[b:b + grid]) for b in range(0, total, grid)]
@@ -96,10 +123,53 @@ def transcribe_perc(y: np.ndarray, sr: int, bpm: float | None, grid: int, bars: 
     }
 
 
+def _match_chord(vec: np.ndarray) -> str:
+    v = vec / (np.linalg.norm(vec) + 1e-9)
+    best = None
+    for root in range(12):
+        for name, iv in _CHORD_TEMPLATES.items():
+            t = np.roll(_template_vec(iv), root)
+            t = t / (np.linalg.norm(t) + 1e-9)
+            score = float(np.dot(v, t))
+            if best is None or score > best[0]:
+                best = (score, _PITCHES[root] + name)
+    return best[1]
+
+
+def transcribe_chord(y: np.ndarray, sr: int, bpm: float | None, grid: int, bars: int | None) -> dict:
+    """Polyphonic: detect stab onsets, label each with a chroma-matched chord."""
+    bpm, t0 = _grid_anchor(y, sr, bpm)
+    step = (60.0 / bpm) / (grid / 4.0)
+    onsets = librosa.onset.onset_detect(y=y, sr=sr, backtrack=True, units="time")
+    chroma = librosa.feature.chroma_cqt(y=y, sr=sr)
+    ct = librosa.times_like(chroma, sr=sr, hop_length=512)
+
+    dur = librosa.get_duration(y=y, sr=sr)
+    total = bars * grid if bars else int(np.ceil((dur - t0) / step))
+    cells = ["~"] * max(total, 0)
+    for ot in onsets:
+        idx = int(round((ot - t0) / step))
+        if idx < 0 or idx >= total:
+            continue
+        w = (ct >= ot) & (ct <= ot + 0.15)
+        if not np.any(w):
+            continue
+        cells[idx] = _match_chord(chroma[:, w].mean(axis=1))
+    bars_out = [" ".join(cells[b:b + grid]) for b in range(0, total, grid)]
+    mini = "<" + " ".join(f"[{b}]" for b in bars_out) + ">"
+    return {"bpm": round(bpm, 1), "grid": grid, "bars": bars_out, "mini": mini}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Second-pass stem transcription -> Strudel mini-notation.")
     ap.add_argument("stem")
-    ap.add_argument("--mode", choices=["mono", "perc"], default="mono")
+    ap.add_argument("--mode", choices=["mono", "perc", "chord"], default="mono")
+    ap.add_argument("--band", choices=["low", "mid", "high"], default=None,
+                    help="perc mode: isolate a frequency register before onset detection")
+    ap.add_argument("--gate", type=float, default=0.0,
+                    help="perc mode: drop hits below this normalized velocity (0..1)")
+    ap.add_argument("--fold", action="store_true",
+                    help="perc mode: fold all bars onto one representative loop bar")
     ap.add_argument("--bpm", type=float, default=None, help="known BPM (aligns the grid; else auto)")
     ap.add_argument("--grid", type=int, default=16, help="grid cells per bar (16 = 16ths)")
     ap.add_argument("--bars", type=int, default=None, help="how many bars to emit (default: whole clip)")
@@ -115,11 +185,21 @@ def main() -> int:
             print(f"  bar {i+1}: {b}")
         print("\nStrudel:")
         print(f'  note("{r["mini"]}").s("gm_synth_bass_2")')
-    else:
-        r = transcribe_perc(y, sr, args.bpm, args.grid, args.bars)
+    elif args.mode == "chord":
+        r = transcribe_chord(y, sr, args.bpm, args.grid, args.bars)
         print(f"bpm={r['bpm']}  grid={r['grid']}")
+        print("\nfirst bars (one per line):")
+        for i, b in enumerate(r["bars"][:8]):
+            print(f"  bar {i+1}: {b}")
         print("\nStrudel:")
-        print(f'  s("bd").struct("{r["struct"]}").gain("{r["gain"]}")')
+        print(f'  chord("{r["mini"]}").voicing().s("gm_accordion")')
+    else:
+        r = transcribe_perc(y, sr, args.bpm, args.grid, args.bars, band=args.band, gate=args.gate, fold=args.fold)
+        snd = BAND_SOUND.get(args.band, "bd")
+        tag = f" [{args.band} band -> {snd}]" if args.band else ""
+        print(f"bpm={r['bpm']}  grid={r['grid']}{tag}")
+        print("\nStrudel:")
+        print(f'  s("{snd}").struct("{r["struct"]}").gain("{r["gain"]}")')
     return 0
 
 
