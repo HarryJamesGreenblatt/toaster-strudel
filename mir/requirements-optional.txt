@@ -1,0 +1,11 @@
+# Optional / heavy MIR tools (Phase 2 & 3). Install as needed:
+#   pip install -r requirements-optional.txt
+#
+# NOTE (Python 3.12): madmom is intentionally omitted — it does not build on 3.12
+# (relies on removed NumPy/Cython APIs). Beat/downbeat tracking uses librosa for now.
+
+# Phase 3 — audio -> MIDI (feeds ../mcp-server/src/analyze-drums.js & tab2strudel.js)
+basic-pitch
+
+# Phase 2 — stem separation (isolate drums/bass/other before analysis)
+demucs
