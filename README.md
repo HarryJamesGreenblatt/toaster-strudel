@@ -1,5 +1,9 @@
 # toaster-strudel
 
+<p align="center">
+  <img src="assets/images/toaster-strudel-cover.png" alt="Toaster Strudel — AI music, together. A conductor pastry mascot beside a toaster pastry iced with a musical note." width="640">
+</p>
+
 Tools and knowledge for **AI-assisted [Strudel](https://strudel.cc) composition** —
 grounded in the real Strudel API, and in the *actual rhythms of real music* rather
 than guesswork.
