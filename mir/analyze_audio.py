@@ -120,6 +120,46 @@ def extract_bassline(y: np.ndarray, sr: int) -> dict:
     return {"bpm": round(tempo, 1), "beats": len(beat_times), "notes_per_beat": notes}
 
 
+# Chord templates (pitch-class intervals from the root)
+_CHORD_TEMPLATES = {
+    "": [0, 4, 7], "m": [0, 3, 7], "7": [0, 4, 7, 10],
+    "maj7": [0, 4, 7, 11], "m7": [0, 3, 7, 10], "sus4": [0, 5, 7], "dim": [0, 3, 6],
+}
+
+
+def _template_vec(intervals: list[int]) -> np.ndarray:
+    v = np.zeros(12)
+    for i in intervals:
+        v[i % 12] = 1.0
+    return v
+
+
+def chord_progression(y: np.ndarray, sr: int, per_bar: bool = True) -> dict:
+    """Beat-synchronous chroma -> chord labels via template matching."""
+    import librosa
+
+    tempo, beats = librosa.beat.beat_track(y=y, sr=sr, trim=False)
+    tempo = float(np.atleast_1d(tempo)[0])
+    chroma = librosa.feature.chroma_cqt(y=y, sr=sr)
+    beat_chroma = librosa.util.sync(chroma, beats, aggregate=np.median)
+
+    templates = []
+    for root in range(12):
+        for name, iv in _CHORD_TEMPLATES.items():
+            t = np.roll(_template_vec(iv), root)
+            templates.append((_PITCHES[root] + name, t / (np.linalg.norm(t) + 1e-9)))
+
+    cols = beat_chroma.shape[1]
+    step = 4 if per_bar else 1
+    labels = []
+    for start in range(0, cols, step):
+        seg = beat_chroma[:, start:start + step].mean(axis=1)
+        seg = seg / (np.linalg.norm(seg) + 1e-9)
+        best = max(templates, key=lambda kt: float(np.dot(seg, kt[1])))
+        labels.append(best[0])
+    return {"bpm": round(tempo, 1), "unit": "bar" if per_bar else "beat", "chords": labels}
+
+
 def analyze(y: np.ndarray, sr: int, bars: int = 4, fixed_tempo: float | None = None) -> dict:
     import librosa
 
@@ -203,6 +243,8 @@ def main() -> int:
     ap.add_argument("--bands", action="store_true", help="split into low/mid/high percussion registers")
     ap.add_argument("--key", action="store_true", help="estimate musical key (chroma / Krumhansl-Schmuckler)")
     ap.add_argument("--bassline", action="store_true", help="pitch-track the bass (note per beat)")
+    ap.add_argument("--chords", action="store_true", help="chord progression via beat-sync chroma templates")
+    ap.add_argument("--per-beat", action="store_true", help="with --chords: label every beat (default: per bar)")
     ap.add_argument("--selftest", action="store_true", help="synthesize & analyze a 90 BPM clip")
     args = ap.parse_args()
 
@@ -227,6 +269,12 @@ def main() -> int:
         print(f"bpm={b['bpm']}  beats={b['beats']}")
         print("note per beat:")
         print("  " + " ".join(b["notes_per_beat"]))
+        return 0
+
+    if args.chords:
+        c = chord_progression(y, sr, per_bar=not args.per_beat)
+        print(f"bpm={c['bpm']}   chord per {c['unit']}:")
+        print("  " + " | ".join(c["chords"]))
         return 0
 
     # --bands: share one tempo, report a grid per frequency register

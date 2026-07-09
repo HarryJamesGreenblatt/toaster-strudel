@@ -46,6 +46,19 @@ Band mode maps to cumbia percussion physics — güira in the highs, congas in t
 bombo in the lows — and reports an accent grid so a *continuous* scrape's dynamic
 "chu-[dip]-chuchu" is visible (onset-counting alone saturates on a scraper).
 
+## Harmonic analysis — key, bassline, chords (works now)
+
+```powershell
+python analyze_audio.py clip.wav --key                 # Krumhansl-Schmuckler key
+python analyze_audio.py stems\bass.wav  --bassline     # pyin note-per-beat
+python analyze_audio.py stems\other.wav --chords       # chord-per-bar (chroma templates)
+python analyze_audio.py clip.wav --chords --per-beat   # chord-per-beat
+```
+
+Measure pitch, not just rhythm: rhythm accuracy alone won't match a recording if the
+key/harmony are guessed. Feed the detected key + progression straight into `note(...)`,
+`chord("<...>")`, and `.voicing()`.
+
 ## Roadmap
 
 - **Phase 3 — audio → MIDI:** Spotify `basic-pitch` emits MIDI for melodic/bass
