@@ -31,15 +31,18 @@ N_FFT = 2048
 HOP = 512
 
 
-def fold(onsets: np.ndarray, t0: float, step: float, grid: int) -> tuple[str, str]:
+def fold(onsets: np.ndarray, t0: float, step: float, grid: int, gate: float = 0.0) -> tuple[str, str]:
+    """Fold a voice's onsets onto one loop bar. `gate` drops cells that don't hit
+    consistently across bars (normalized count < gate) so the pattern stays sparse."""
     acc = np.zeros(grid)
     for ot in onsets:
         cell = int(round((ot - t0) / step))
         if cell >= 0:
             acc[cell % grid] += 1.0
     peak = acc.max() if acc.max() > 0 else 1.0
-    struct = " ".join("x" if acc[i] > 0 else "~" for i in range(grid))
-    gain = " ".join(f"{acc[i] / peak:.2f}" if acc[i] > 0 else "0" for i in range(grid))
+    norm = [(acc[i] / peak) if (acc[i] / peak) >= gate else 0.0 for i in range(grid)]
+    struct = " ".join("x" if norm[i] > 0 else "~" for i in range(grid))
+    gain = " ".join(f"{norm[i]:.2f}" if norm[i] > 0 else "0" for i in range(grid))
     return struct, gain
 
 
@@ -49,6 +52,8 @@ def main() -> int:
     ap.add_argument("--voices", type=int, default=4)
     ap.add_argument("--bpm", type=float, default=None)
     ap.add_argument("--grid", type=int, default=16)
+    ap.add_argument("--gate", type=float, default=0.0,
+                    help="drop grid cells hit in fewer than this fraction of bars (0..1)")
     ap.add_argument("--out", default="drumnmf")
     args = ap.parse_args()
 
@@ -93,7 +98,7 @@ def main() -> int:
         env = H[k] / (H[k].max() + 1e-9)
         onsets = librosa.onset.onset_detect(onset_envelope=env, sr=sr, hop_length=HOP,
                                             backtrack=True, units="time")
-        struct, gain = fold(onsets, t0, step, args.grid)
+        struct, gain = fold(onsets, t0, step, args.grid, gate=args.gate)
         print(f"voice {rank} [{name}]  centroid={centroids[k]:6.0f}Hz  hits={len(onsets):>3}  -> {rank}_{snd}.wav")
         print(f'  s("{snd}").struct("<[{struct}]>").gain("<[{gain}]>")')
 
