@@ -1,12 +1,27 @@
 # toaster-strudel
 
-<p align="center">
-  <img src="assets/images/toaster-strudel-cover.png" alt="Toaster Strudel — AI music, together. A conductor pastry mascot beside a toaster pastry iced with a musical note." width="640">
-</p>
+<table>
+<tr>
+<td width="50%">
+<img src="assets/images/toaster-strudel-cover.png" alt="Toaster Strudel — AI music, together. A conductor pastry mascot beside a toaster pastry iced with a musical note." width="100%">
+</td>
+<td width="50%" valign="middle">
 
-Tools and knowledge for **AI-assisted [Strudel](https://strudel.cc) composition** —
-grounded in the real Strudel API, and in the *actual rhythms of real music* rather
-than guesswork.
+$$
+\begin{aligned}
+&\LARGE\textsf{Tools and knowledge for} \\
+&\LARGE\textbf{\textsf{AI-assisted Strudel composition}} \\
+&\large\textit{\textcolor{gray}{grounded in the real Strudel API, and in}} \\
+&\large\textit{\textcolor{gray}{the actual rhythms of real music}} \\
+&\large\textit{\textcolor{gray}{rather than guesswork.}}
+\end{aligned}
+$$
+
+<div align="right"><sub>Strudel: <a href="https://strudel.cc">https://strudel.cc</a></sub></div>
+
+</td>
+</tr>
+</table>
 
 The guiding idea: don't approximate a genre from its name. **Measure it.** Pull real
 performance data (MIDI today, sampled audio via MIR next), analyze the groove
