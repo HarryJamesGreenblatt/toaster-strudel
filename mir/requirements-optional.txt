@@ -9,3 +9,6 @@ basic-pitch
 
 # Phase 2 — stem separation (isolate drums/bass/other before analysis)
 demucs
+
+# Drum-voice separation (onset timbre clustering in split_drums.py)
+scikit-learn
