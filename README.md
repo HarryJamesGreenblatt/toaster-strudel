@@ -45,14 +45,22 @@ toaster-strudel/
 
 ## Workflow
 
-- **Host:** the [`cmillsdev.strudelvs`](https://marketplace.visualstudio.com/items?itemName=cmillsdev.strudelvs)
-  VS Code extension runs the real Strudel engine in a webview and plays the active
-  `.strudel.js` file — **Ctrl+Enter** play, **Ctrl+.** stop — with all instruments,
-  pianoroll, and live highlighting.
-- **Compose:** edit `.strudel.js` files with normal editor tools; press Ctrl+Enter.
+- **Host:** [strudel.cc](https://strudel.cc) itself — the real, continuously-updated
+  Strudel app, with its own docs, autocomplete, sound banks, and file IO. It is the
+  single source of truth for playback and timbre.
+- **Compose:** edit `.strudel.js` files with normal editor tools.
+- **Play & verify:** the assistant drives strudel.cc directly via browser automation
+  — loads the active file into the real editor, presses play, reads back any error,
+  and screenshots the pianoroll — so what you hear is exactly the live engine, with no
+  copy-paste and no third-party reimplementation in between.
 - **Ground:** consult the `strudel_docs` MCP tool for the real API before writing.
-- **Verify:** analyze real performances to learn a genre's rhythmic nuance instead
-  of guessing (see `mcp-server/src/analyze-drums.js`).
+- **Verify groove:** analyze real performances to learn a genre's rhythmic nuance
+  instead of guessing (see `mcp-server/src/analyze-drums.js`).
+
+> **Why not the VS Code Strudel extension?** It bundles its *own* frozen copy of the
+> engine and a different set of sample packs, so the same code can play on strudel.cc
+> yet stay silent — or sound different — in the extension. We standardize on the real
+> app to keep playback trustworthy and reproducible.
 
 ## Importers
 
