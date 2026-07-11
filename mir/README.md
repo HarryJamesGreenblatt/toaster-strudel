@@ -131,6 +131,56 @@ For splitting the composite `other` stem (accordion/guitar/piano), use the 6-sou
 python separate_stems.py clip.wav --model htdemucs_6s   # adds guitar + piano stems
 ```
 
+## Track identification + liner notes (LEFT side — works now)
+
+Before analyzing the *signal*, establish the *identity* — so you never have to embed
+song info in filenames, and so real-world context can ground the reproduction.
+
+```powershell
+# Recognize an unlabeled clip (Shazam backend, AcoustID + filename fallbacks)
+python identify.py "clip.wav"
+
+# Enrich the identity with credits/styles/notes (MusicBrainz + Discogs), chained
+python identify.py --json "clip.wav" | python linernotes.py
+```
+
+`identify.py` → identity + ISRC + album/label/year/genre. `linernotes.py` → personnel,
+styles, production notes. Secrets (AcoustID, Discogs) resolve via `secret_store.py`
+(Windows Credential Manager); MusicBrainz needs no key. Both emit the Song IR `context`
+block as JSON. See the repo memory for the recognizer-coverage caveats.
+
+## Instrument inference (LEFT side — the method)
+
+**Not knowing which instruments a track uses is what lets a reproduction hallucinate
+riffs.** The resolved instrument set becomes a **whitelist**: the reproduction may build
+*only* these voices, each bound to a real Strudel sound.
+
+Three tiers, most reliable first (confidence = how many agree):
+
+1. **Web research (primary)** — literally *"what instruments are in [title] by
+   [artist]"*: gear forums, synth communities, Sound-on-Sound, Wikipedia. Agent-driven.
+   Rich for documented tracks (e.g. Moments in Love → Fairlight CMI ARR1 vocal, ORCH5
+   stab, PPG Wave, synth strings, electric piano).
+2. **Genre convention (fills gaps)** — when the web is track-thin (e.g. an obscure
+   cumbia), fall back to genre norms + your ear (cumbia sonidera → güira, accordion/
+   teclado, synth bass, congas + tambora).
+3. **Audio evidence (arbiter)** — the separation/transcription tools above confirm which
+   candidates actually sound in *this* recording.
+
+The agent produces raw instrument names; `resolve_instruments.py` maps them onto the
+**actual Strudel palette** (`sound_palette.json`, grounded from strudel.cc's 1655-sound
+registry), flagging **proxies** (no exact match → nearest substitute) and **gaps**
+(nothing suitable — never invent one):
+
+```powershell
+python resolve_instruments.py --instruments "orchestra hit,choir,synth strings,bass"
+# teclado -> gm_accordion ~proxy ;  theremin -> (NO SOUND - gap)
+```
+
+`sound_palette.json` is the shared vocabulary the eventual assembler also consumes:
+`palette` = available sounds by role, `aliases` = real-instrument → nearest Strudel
+sound with proxy notes. Infer only at the resolution Strudel can render — no finer.
+
 ## Roadmap
 
 - **Phase 3 — audio → MIDI:** Spotify `basic-pitch` emits MIDI for melodic/bass
