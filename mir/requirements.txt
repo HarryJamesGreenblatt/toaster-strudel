@@ -2,3 +2,8 @@
 librosa>=0.10.2
 soundfile>=0.12.1
 numpy>=1.26
+
+# Left-side pipeline: identification + liner notes + secrets
+shazamio>=0.8.1      # primary recognizer (Shazam backend) — broad coverage
+requests>=2.31       # AcoustID fallback + HTTP metadata lookups
+keyring>=25.0        # secrets via Windows Credential Manager (see secret_store.py)
