@@ -7,3 +7,4 @@ numpy>=1.26
 shazamio>=0.8.1      # primary recognizer (Shazam backend) — broad coverage
 requests>=2.31       # AcoustID fallback + HTTP metadata lookups
 keyring>=25.0        # secrets via Windows Credential Manager (see secret_store.py)
+jsonschema>=4.0      # validate Song IR documents against song-ir/schema.json

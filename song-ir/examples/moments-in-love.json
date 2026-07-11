@@ -1,0 +1,129 @@
+{
+  "schema_version": "0.1",
+  "context": {
+    "title": "Moments In Love",
+    "artist": "Art of Noise",
+    "isrc": "GBAHW0800138",
+    "album": "Moments In Love",
+    "label": "ZTT Records",
+    "year": "1983",
+    "genre": "Dance",
+    "styles": ["ambient", "chill-out", "synth-pop", "downtempo"],
+    "personnel": [
+      { "name": "Trevor Horn", "role": "arranger/producer" },
+      { "name": "Anne Dudley", "role": "writer / Fairlight programmer" },
+      { "name": "J. J. Jeczalik", "role": "writer / Fairlight programmer" }
+    ],
+    "signature": "Fairlight CMI — ORCH5 orchestra-hit stab + ARR1 'aah' vocal sample",
+    "instruments_raw": ["Fairlight ARR1 vocal", "orchestra hit", "synth strings", "electric piano", "acoustic bass", "drum machine"],
+    "recognizer": "shazam",
+    "confidence": "high",
+    "source": ["shazam", "musicbrainz", "discogs", "web"]
+  },
+
+  "meta": {
+    "tempo_bpm": 68.9,
+    "setcpm": 17.225,
+    "key": "C#",
+    "mode": "minor",
+    "feel": "straight",
+    "bars": 16,
+    "key_sources": ["MIR chroma (Krumhansl-Schmuckler)", "Wikipedia category 'Compositions in C-sharp minor'"]
+  },
+
+  "harmony": {
+    "progression": ["C#m9", "Emaj9", "C#m9", "G#m7"],
+    "per": "two-bar",
+    "voicing": "long attack/release pads; modal hover, no hard downbeats"
+  },
+
+  "parts": [
+    {
+      "id": "orch-hit",
+      "role": "hook",
+      "instrument": { "name": "orchestra hit (Fairlight ORCH5)", "strudel_sound": "gm_orchestra_hit", "resolvability": "exact" },
+      "signals": {
+        "doc_confidence": "high",
+        "timbre_signature": true,
+        "resolvability": "exact",
+        "transcription_confidence": "high",
+        "separation": { "isolated": false, "energy_share": null, "centroid_hz": null, "bleed": "high", "stem": "other (tonal — will not isolate as percussive)" }
+      },
+      "candidate_modes": [
+        { "mode": "reproduce", "feasible": true, "note": "exact GM sound; MIDI orch-hit track gives the stab figure" },
+        { "mode": "sample", "feasible": false, "note": "tonal stab does not isolate (other.wav ~95% harmonic)" }
+      ],
+      "chosen_route": { "mode": "reproduce", "rationale": "exact sound + clean symbolic source; sampling infeasible (won't isolate) and unnecessary", "overridable": true },
+      "render": {
+        "reproduce": { "sound": "gm_orchestra_hit", "pattern": "note(\"<[c#4,e4,g#4] ~ [b3,g#4] [a3,e4]>\").sound(\"gm_orchestra_hit\")", "gain": 0.8, "orbit": 2 }
+      },
+      "provenance": { "instrument": ["web", "midi:orchestra-hit-track"], "notes": ["shazam", "wikipedia"], "stem": null }
+    },
+
+    {
+      "id": "vocal-hook",
+      "role": "hook",
+      "instrument": { "name": "Fairlight ARR1 'aah' vocal sample", "strudel_sound": "gm_choir_aahs", "resolvability": "proxy" },
+      "signals": {
+        "doc_confidence": "high",
+        "timbre_signature": true,
+        "resolvability": "proxy",
+        "transcription_confidence": "medium",
+        "separation": { "isolated": true, "energy_share": 0.18, "centroid_hz": 900, "bleed": "low", "stem": "vocals.wav (the c#4<->g#4 ostinato)" }
+      },
+      "candidate_modes": [
+        { "mode": "proxy", "feasible": true, "note": "gm_choir_aahs approximates the 'aah' but not the specific ARR1 grain" },
+        { "mode": "sample", "feasible": true, "note": "isolates cleanly in the vocals stem; signature timbre worth keeping verbatim" }
+      ],
+      "chosen_route": { "mode": "sample", "rationale": "signature un-clonable timbre that isolates cleanly; proxy loses the defining character -> loop the real voice", "overridable": true },
+      "render": {
+        "sample": { "sample_ref": "moments_arr1_ostinato.wav", "chop_or_loop": "loop", "n": 2, "pattern": "samples('http://localhost:8000/'); s(\"moments_arr1_ostinato\").loopAt(2).gain(0.5).room(0.6)", "gain": 0.5, "orbit": 1, "source_stem": "separated/htdemucs/<clip>/vocals.wav", "local_only": true }
+      },
+      "provenance": { "instrument": ["web", "audio"], "notes": ["matrixsynth: ARR1"], "stem": "vocals.wav" }
+    },
+
+    {
+      "id": "pads",
+      "role": "pad",
+      "instrument": { "name": "synth strings / pad", "strudel_sound": "gm_synth_strings_1", "resolvability": "exact" },
+      "signals": {
+        "doc_confidence": "high", "timbre_signature": false, "resolvability": "exact", "transcription_confidence": "high",
+        "separation": { "isolated": true, "energy_share": 0.5, "centroid_hz": 1200, "bleed": "medium", "stem": "other.wav (harmonic)" }
+      },
+      "candidate_modes": [
+        { "mode": "reproduce", "feasible": true, "note": "generic pad role; synth is flexible + mixes cleaner than a sample" },
+        { "mode": "sample", "feasible": true, "note": "possible, but no reason — role is generic" }
+      ],
+      "chosen_route": { "mode": "reproduce", "rationale": "generic harmonic bed; a synth voicing follows the chords and layers cleanly", "overridable": true },
+      "render": {
+        "reproduce": { "sound": "gm_synth_strings_1", "pattern": "chord(\"<C#m9 Emaj9 C#m9 G#m7>\").slow(2).voicing().sound(\"gm_synth_strings_1\").gain(0.45).attack(1).release(2)", "gain": 0.45, "orbit": 0 }
+      },
+      "provenance": { "instrument": ["web", "genre"], "notes": ["discogs:styles"], "stem": "other.wav" }
+    },
+
+    {
+      "id": "bass",
+      "role": "bass",
+      "instrument": { "name": "acoustic/synth bass", "strudel_sound": "gm_synth_bass_1", "resolvability": "exact" },
+      "signals": {
+        "doc_confidence": "medium", "timbre_signature": false, "resolvability": "exact", "transcription_confidence": "high",
+        "separation": { "isolated": true, "energy_share": 0.2, "centroid_hz": 200, "bleed": "low", "stem": "bass.wav" }
+      },
+      "candidate_modes": [
+        { "mode": "reproduce", "feasible": true, "note": "clean pyin transcription; root-following" }
+      ],
+      "chosen_route": { "mode": "reproduce", "rationale": "isolates cleanly, transcribes cleanly, generic role", "overridable": true },
+      "render": {
+        "reproduce": { "sound": "gm_synth_bass_1", "pattern": "n(\"0\").set(chords).mode(\"root:c2\").voicing().sound(\"gm_synth_bass_1\").gain(0.6)", "gain": 0.6, "orbit": 0 }
+      },
+      "provenance": { "instrument": ["audio"], "notes": [], "stem": "bass.wav" }
+    }
+  ],
+
+  "render_target": {
+    "host": "strudel.cc",
+    "setcpm": 17.225,
+    "master_gain": 0.8,
+    "sample_server": "http://localhost:8000/"
+  }
+}

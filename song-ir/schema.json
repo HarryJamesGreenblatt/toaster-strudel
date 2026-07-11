@@ -1,0 +1,190 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/HarryJamesGreenblatt/toaster-strudel/song-ir/schema.json",
+  "title": "Song IR",
+  "description": "The single intermediate representation every toaster-strudel tool reads and writes. It carries the LEFT side (identity + liner notes), the measured meta/harmony, and PARTS. Each part holds an ADAPTIVE ROUTING model (signals -> candidate_modes -> chosen_route) so the orchestration layer's per-track decisions are transparent, provenance-tracked, and human-overridable. Tools PRESENT options+signals; the orchestrator (agent + policy) CHOOSES; this document RECORDS.",
+  "type": "object",
+  "required": ["schema_version", "context", "meta", "parts"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+
+    "context": {
+      "description": "LEFT side: who/what/how, from identify.py + linernotes.py + agent web research.",
+      "type": "object",
+      "properties": {
+        "title":       { "type": "string" },
+        "artist":      { "type": "string" },
+        "isrc":        { "type": ["string", "null"] },
+        "album":       { "type": ["string", "null"] },
+        "label":       { "type": ["string", "null"] },
+        "year":        { "type": ["string", "integer", "null"] },
+        "genre":       { "type": ["string", "null"] },
+        "styles":      { "type": "array", "items": { "type": "string" } },
+        "personnel":   { "type": "array", "items": { "type": "object" } },
+        "signature":   { "type": ["string", "null"], "description": "the defining sonic element, if known (e.g. 'Fairlight ORCH5 stab')" },
+        "instruments_raw": { "type": "array", "items": { "type": "string" }, "description": "instrument names as inferred (pre-resolution)" },
+        "recognizer":  { "type": ["string", "null"], "enum": ["shazam", "acoustid", "filename", null] },
+        "confidence":  { "$ref": "#/definitions/confidence" },
+        "source":      { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "meta": {
+      "description": "Measured musical frame (right side / MIR + cross-checks).",
+      "type": "object",
+      "required": ["tempo_bpm"],
+      "properties": {
+        "tempo_bpm":  { "type": "number" },
+        "setcpm":     { "type": "number", "description": "tempo_bpm / beats-per-cycle (usually /4)" },
+        "key":        { "type": ["string", "null"] },
+        "mode":       { "type": ["string", "null"], "description": "major | minor | modal ..." },
+        "feel":       { "type": ["string", "null"], "description": "straight | triplet | swung" },
+        "bars":       { "type": ["integer", "null"] },
+        "sections":   { "type": "array", "items": { "type": "object",
+                         "properties": { "name": { "type": "string" }, "bars": { "type": "integer" } } } },
+        "key_sources": { "type": "array", "items": { "type": "string" }, "description": "e.g. ['MIR chroma','Wikipedia'] — cross-check provenance" }
+      }
+    },
+
+    "harmony": {
+      "type": "object",
+      "properties": {
+        "progression": { "type": "array", "items": { "type": "string" } },
+        "per":         { "type": "string", "enum": ["bar", "beat", "two-bar"] },
+        "voicing":     { "type": ["string", "null"] }
+      }
+    },
+
+    "parts": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/part" }
+    },
+
+    "render_target": {
+      "type": "object",
+      "properties": {
+        "host":       { "const": "strudel.cc" },
+        "setcpm":     { "type": "number" },
+        "master_gain":{ "type": "number" },
+        "sample_server": { "type": ["string", "null"], "description": "local http origin for sampled parts, e.g. 'http://localhost:8000/' — LOCAL ONLY, never the public repo (copyright)" }
+      }
+    }
+  },
+
+  "definitions": {
+    "confidence": { "type": "string", "enum": ["high", "medium", "low", "na"] },
+    "mode": { "type": "string", "enum": ["reproduce", "proxy", "sample", "gap"] },
+
+    "part": {
+      "description": "One voice/layer of the reproduction, carrying its adaptive routing.",
+      "type": "object",
+      "required": ["id", "role", "signals", "candidate_modes", "chosen_route"],
+      "additionalProperties": false,
+      "properties": {
+        "id":   { "type": "string" },
+        "role": { "type": "string", "description": "bass | lead | pad | keys | hook | perc | drums | ..." },
+
+        "instrument": {
+          "type": "object",
+          "properties": {
+            "name":          { "type": "string", "description": "real-world instrument, e.g. 'güira', 'orchestra hit (ORCH5)'" },
+            "strudel_sound": { "type": ["string", "null"] },
+            "resolvability": { "type": "string", "enum": ["exact", "proxy", "gap"] }
+          }
+        },
+
+        "signals": {
+          "description": "The inputs the orchestrator routes ON. Populated by the tools; the orchestrator never invents these.",
+          "type": "object",
+          "properties": {
+            "doc_confidence":           { "$ref": "#/definitions/confidence", "description": "how well documented the instrument is (web/credits)" },
+            "timbre_signature":         { "type": "boolean", "description": "is this an irreplaceable/defining timbre?" },
+            "resolvability":            { "type": "string", "enum": ["exact", "proxy", "gap"] },
+            "transcription_confidence": { "$ref": "#/definitions/confidence" },
+            "separation": {
+              "type": "object",
+              "properties": {
+                "isolated":     { "type": "boolean" },
+                "energy_share": { "type": ["number", "null"] },
+                "centroid_hz":  { "type": ["number", "null"] },
+                "onset_count":  { "type": ["integer", "null"] },
+                "bleed":        { "type": ["string", "null"], "enum": ["low", "medium", "high", null] },
+                "stem":         { "type": ["string", "null"], "description": "source WAV, e.g. 'drumnmf/3_snd.wav'" }
+              }
+            }
+          }
+        },
+
+        "candidate_modes": {
+          "description": "The MENU the tools present. The orchestrator picks from here.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["mode", "feasible"],
+            "properties": {
+              "mode":     { "$ref": "#/definitions/mode" },
+              "feasible": { "type": "boolean" },
+              "note":     { "type": "string" }
+            }
+          }
+        },
+
+        "chosen_route": {
+          "description": "The orchestrator's adaptive decision. Overridable by the human.",
+          "type": "object",
+          "required": ["mode", "rationale"],
+          "properties": {
+            "mode":        { "$ref": "#/definitions/mode" },
+            "rationale":   { "type": "string" },
+            "overridable": { "type": "boolean", "default": true }
+          }
+        },
+
+        "render": {
+          "description": "Concrete render content, keyed by mode. Only the chosen mode need be populated.",
+          "type": "object",
+          "properties": {
+            "reproduce": { "$ref": "#/definitions/renderSynth" },
+            "proxy":     { "$ref": "#/definitions/renderSynth" },
+            "sample":    { "$ref": "#/definitions/renderSample" }
+          }
+        },
+
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "instrument": { "type": "array", "items": { "type": "string" } },
+            "notes":      { "type": "array", "items": { "type": "string" } },
+            "stem":       { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+
+    "renderSynth": {
+      "type": "object",
+      "properties": {
+        "sound":   { "type": "string" },
+        "pattern": { "type": "string", "description": "the Strudel snippet: note(...)/n(...)/s(...).struct(...) etc." },
+        "gain":    { "type": "number" },
+        "orbit":   { "type": ["integer", "null"] },
+        "fx":      { "type": "object" }
+      }
+    },
+
+    "renderSample": {
+      "type": "object",
+      "properties": {
+        "sample_ref":  { "type": "string", "description": "local WAV filename (gitignored; served from the local sample_server)" },
+        "chop_or_loop":{ "type": "string", "enum": ["loop", "chop", "slice"] },
+        "n":           { "type": ["integer", "null"], "description": "slices for chop/slice, or cycles for loopAt" },
+        "pattern":     { "type": "string", "description": "the Strudel snippet, e.g. s(\"guira\").chop(16).gain(...)" },
+        "gain":        { "type": "number" },
+        "orbit":       { "type": ["integer", "null"] },
+        "source_stem": { "type": "string" },
+        "local_only":  { "const": true, "description": "derived from copyrighted audio; NEVER commit or host publicly" }
+      }
+    }
+  }
+}
