@@ -25,6 +25,10 @@ mir/.venv/
 *.pyo
 .python-version
 
+# Secrets — NEVER commit. Real keys live in Windows Credential Manager (keyring).
+.env
+mir/.env
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db
