@@ -79,6 +79,58 @@ octave pump, which the per-beat median flattened to a single `f2`.
 Polyphonic stems (accordion in `other`) need multi-pitch transcription — a future
 `basic-pitch` add. `mono` handles single-line parts well today.
 
+## Second pass, stage 2 — sub-separate a lumped stem (works now)
+
+htdemucs 4-stem lumps **every** synth (pads, strings, lead, orchestra hits) into the
+single `other` stem. Transcribing `other` directly feeds basic-pitch a multi-instrument
+soup → noise. `subseparate.py` splits ONE stem into instrument voices *before*
+transcribing:
+
+```powershell
+# HPSS: sustained pads (harmonic) vs. orch-hit stabs (percussive), + optional NMF
+python subseparate.py "separated\htdemucs\<clip>\other.wav" --margin 4 --voices 2
+```
+
+- **HPSS** writes `harmonic.wav` (pads/strings/sustained lead) and `percussive.wav`
+  (attack-heavy stabs). **NMF** (`--voices K --target harmonic|percussive|both`) factors
+  a part further into Wiener-masked spectral voices.
+- Every output is a listenable WAV; the tool reports spectral centroid, energy share and
+  onset count per voice so you can identify each, then transcribe it in isolation.
+- **Caveat learned:** this only works when the instruments differ in the HPSS/spectral
+  sense. On a pad-drenched, tonal track (Moments in Love) the `other` stem measured
+  **~95% sustained harmonic energy** and the *tonal* orch hits would not separate as
+  "percussive" — so no clean orch-hit layer exists to pull out. When a song is dominated
+  by overlapping sustained synths, prefer a real **MIDI multitrack** (`tab2strudel
+  --fetch`) where each instrument is already its own clean track.
+
+
+## Drum-voice separation (works now)
+
+A single Demucs `drums` stem is a dense ensemble; frequency-band splitting is NOT
+instrument separation (a kick and a conga both hit the low band → every voice fires on
+the same grid = jackhammer). Two real approaches:
+
+```powershell
+pip install -r requirements-optional.txt   # adds scikit-learn
+
+# Onset timbre clustering — assigns each HIT to one voice (bleeds on overlaps)
+python split_drums.py "separated\htdemucs\<clip>\drums.wav" --voices 4 --bpm 97.5
+
+# NMF spectral factorization — handles OVERLAP, soft-mask reconstruction (cleaner)
+python nmf_drums.py   "separated\htdemucs\<clip>\drums.wav" --voices 4 --bpm 97.5
+```
+
+Both write **listenable per-voice WAVs** (`drumvoices/` and `drumnmf/`) so you confirm
+each channel by ear, plus a folded `struct`/`gain` per voice. Prefer **NMF** — it
+factors the spectrogram into templates × activations, so overlapping hits are decomposed
+rather than duplicated. Note: centroid order ≠ instrument identity — always audition.
+
+For splitting the composite `other` stem (accordion/guitar/piano), use the 6-source model:
+
+```powershell
+python separate_stems.py clip.wav --model htdemucs_6s   # adds guitar + piano stems
+```
+
 ## Roadmap
 
 - **Phase 3 — audio → MIDI:** Spotify `basic-pitch` emits MIDI for melodic/bass

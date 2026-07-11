@@ -54,6 +54,8 @@ def main() -> int:
     ap.add_argument("--grid", type=int, default=16)
     ap.add_argument("--gate", type=float, default=0.0,
                     help="drop grid cells hit in fewer than this fraction of bars (0..1)")
+    ap.add_argument("--t0", type=float, default=None,
+                    help="grid anchor in seconds (share across stems to phase-lock them)")
     ap.add_argument("--out", default="drumnmf")
     args = ap.parse_args()
 
@@ -68,16 +70,19 @@ def main() -> int:
     centroids = [float((W[:, k] * freqs).sum() / (W[:, k].sum() + 1e-9)) for k in range(args.voices)]
     order = list(np.argsort(centroids))  # ascending centroid -> bombo..guira
 
-    # grid anchor
+    # grid anchor (shared --t0 locks multiple stems to the same downbeat)
     if args.bpm:
         bpm = args.bpm
+    else:
+        tempo, _ = librosa.beat.beat_track(y=y, sr=sr, units="time")
+        bpm = float(np.atleast_1d(tempo)[0])
+    if args.t0 is not None:
+        t0 = args.t0
+    else:
         onset_all = librosa.onset.onset_detect(y=y, sr=sr, backtrack=True, units="time")
         t0 = float(onset_all[0]) if len(onset_all) else 0.0
-    else:
-        tempo, beats = librosa.beat.beat_track(y=y, sr=sr, units="time")
-        bpm = float(np.atleast_1d(tempo)[0])
-        t0 = float(beats[0]) if len(beats) else 0.0
     step = (60.0 / bpm) / (args.grid / 4.0)
+    print(f"anchor t0={t0:.3f}s  step={step*1000:.1f}ms")
 
     total = (W @ H) + 1e-9
     out_dir = Path(args.out)
