@@ -73,7 +73,8 @@
       ],
       "chosen_route": { "mode": "sample", "rationale": "defining, un-clonable continuous scrape that isolates cleanly as its own NMF voice; proxy guiro loses the character -> chop the real loop", "overridable": true },
       "render": {
-        "sample": { "sample_ref": "kual_guira_1bar.wav", "chop_or_loop": "chop", "n": 16, "pattern": "samples('http://localhost:8000/'); s(\"kual_guira_1bar\").chop(16).gain(\"0.49 0.16 0.54 0.21 0.21 1 0.62 0.38 0.1 0.46 0.5 0.17 0.62 0.89 0.24 0.19\")", "gain": 0.6, "orbit": 3, "source_stem": "mir/drumnmf/3_snd.wav", "local_only": true }
+        "sample": { "sample_ref": "kual_guira_1bar.wav", "chop_or_loop": "chop", "n": 16, "pattern": "samples('http://localhost:8000/'); s(\"kual_guira_1bar\").chop(16).gain(\"0.49 0.16 0.54 0.21 0.21 1 0.62 0.38 0.1 0.46 0.5 0.17 0.62 0.89 0.24 0.19\")", "gain": 0.6, "orbit": 3, "source_stem": "mir/drumnmf/3_snd.wav", "local_only": true },
+        "proxy": { "sound": "guiro", "pattern": "s(\"guiro\").struct(\"x ~ x x x ~ x x x ~ x x x ~ x x\").gain(0.4)", "gain": 0.4, "orbit": 3 }
       },
       "provenance": { "instrument": ["genre", "audio"], "notes": [], "stem": "drumnmf/3_snd.wav (8216Hz)" }
     },
