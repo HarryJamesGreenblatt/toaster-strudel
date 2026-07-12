@@ -19,7 +19,7 @@ from __future__ import annotations
 import argparse
 import os
 from functools import partial
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
 
 class CORSRequestHandler(SimpleHTTPRequestHandler):
@@ -42,7 +42,7 @@ def main() -> int:
 
     os.makedirs(args.dir, exist_ok=True)
     handler = partial(CORSRequestHandler, directory=os.path.abspath(args.dir))
-    httpd = HTTPServer(("", args.port), handler)
+    httpd = ThreadingHTTPServer(("", args.port), handler)
     print(f"serving {args.dir} on http://localhost:{args.port}/ (CORS enabled)")
     httpd.serve_forever()
     return 0
