@@ -35,6 +35,9 @@ def main() -> int:
     ap.add_argument("--mono", action="store_true", help="keep only the highest note per cell (melody line)")
     ap.add_argument("--min-pitch", type=int, default=0, help="drop notes below this MIDI number")
     ap.add_argument("--max-pitch", type=int, default=127, help="drop notes above this MIDI number")
+    ap.add_argument("--min-dur", type=float, default=0.0, help="drop notes shorter than this (s) — filters arpeggio filler")
+    ap.add_argument("--min-amp", type=float, default=0.0, help="drop notes quieter than this amplitude (0..1)")
+    ap.add_argument("--hold", action="store_true", help="sustain each note for its duration (uses _) instead of one-cell hits")
     args = ap.parse_args()
 
     y, sr = librosa.load(args.stem, sr=None, mono=True)
@@ -51,31 +54,52 @@ def main() -> int:
 
     # notes: (start_s, end_s, pitch_midi, amplitude, bends) — times relative to the trim
     step = (60.0 / args.bpm) / (args.grid / 4.0)
-    cells: dict[int, list[tuple[int, float]]] = {}
+    events = []  # (onset_idx, pitch, amp, dur_cells)
     max_idx = 0
     for ev in notes:
         st, en, pitch, amp = ev[0], ev[1], int(ev[2]), float(ev[3])
         if pitch < args.min_pitch or pitch > args.max_pitch:
             continue
+        dur = en - st
+        if dur < args.min_dur or amp < args.min_amp:
+            continue
         idx = int(round(st / step))  # --start is a bar boundary -> relative == grid-aligned
         if idx < 0:
             continue
-        cells.setdefault(idx, []).append((pitch, amp))
+        dcells = max(1, int(round(dur / step)))
+        events.append((idx, pitch, amp, dcells))
         max_idx = max(max_idx, idx)
 
     total = ((max_idx // args.grid) + 1) * args.grid
     seq = ["~"] * total
-    for idx, plist in cells.items():
-        if args.mono:
-            pitch = max(plist, key=lambda x: x[0])[0]
+
+    if args.mono:
+        # one line: keep the top (highest) pitch at each onset cell
+        by_cell: dict[int, tuple[int, int]] = {}
+        for idx, pitch, amp, dcells in events:
+            cur = by_cell.get(idx)
+            if cur is None or pitch > cur[0]:
+                by_cell[idx] = (pitch, dcells)
+        onsets = sorted(by_cell)
+        for i, idx in enumerate(onsets):
+            pitch, dcells = by_cell[idx]
             seq[idx] = librosa.midi_to_note(pitch, unicode=False).lower().replace("♯", "#")
-        else:
-            pitches = sorted({p for p, _ in plist})
-            names = ",".join(librosa.midi_to_note(p, unicode=False).lower().replace("♯", "#") for p in pitches)
-            seq[idx] = f"[{names}]" if len(pitches) > 1 else names
+            if args.hold:
+                nxt = onsets[i + 1] if i + 1 < len(onsets) else total
+                for j in range(idx + 1, min(idx + dcells, nxt, total)):
+                    seq[j] = "_"
+    else:
+        poly: dict[int, set[int]] = {}
+        for idx, pitch, amp, dcells in events:
+            poly.setdefault(idx, set()).add(pitch)
+        for idx, pitches in poly.items():
+            ps = sorted(pitches)
+            names = ",".join(librosa.midi_to_note(p, unicode=False).lower().replace("♯", "#") for p in ps)
+            seq[idx] = f"[{names}]" if len(ps) > 1 else names
 
     bars = [" ".join(seq[b:b + args.grid]) for b in range(0, total, args.grid)]
     mini = "<" + " ".join(f"[{b}]" for b in bars) + ">"
+    print(f"kept notes={len(events)} (of {len(notes)})  ", end="")
 
     print(f"basic-pitch notes={len(notes)}  used bars={len(bars)}  grid={args.grid}\n")
     for i, b in enumerate(bars):
