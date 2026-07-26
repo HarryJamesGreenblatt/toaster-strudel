@@ -2,6 +2,11 @@
 /jams/
 /arrangements/
 
+# Local-scope agent knowledge + per-track working data (durable, not published).
+# Point agents here across sessions: read /context/AGENTS.md first.
+/context/
+/artifacts/
+
 # Node
 node_modules/
 npm-debug.log*
